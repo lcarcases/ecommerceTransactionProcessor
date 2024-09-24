@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v4"
 	"github.com/joho/godotenv"
 )
 
@@ -27,6 +29,19 @@ func main() {
 	transactionsByMonth := make(map[string]MonthTransactions)
 	totalRevenue := 0.0
 	report := ""
+
+	// Set up the PostgreSQL connection URL
+	// Username is "myuser" and password is "mypassword" and was set up in "Dockerfile"
+	// Database name is mydatabase and was set up in Dockerfile
+	connStr := "postgres://myuser:mypassword@localhost:5433/mydatabase"
+
+	// Establish the connection
+	conn, err := pgx.Connect(context.Background(), connStr)
+	if err != nil {
+		log.Fatal("Unable to connect to database:", err)
+	}
+
+	defer conn.Close(context.Background())
 
 	// Open the CSV file
 	file, err := os.Open("transacciones.csv")
@@ -51,12 +66,20 @@ func main() {
 		if i == 0 {
 			continue
 		}
+
+		transactionId, err := strconv.Atoi(record[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		date, err := time.Parse("01/02/06", record[1])
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		month := date.Month().String()
+
+		productId, err := strconv.Atoi(record[2])
 
 		if _, exists := transactionsByMonth[month]; !exists {
 			transactionsByMonth[month] = MonthTransactions{0, 0}
@@ -86,6 +109,14 @@ func main() {
 			avgTransactionValue := transactions.sum / float64(transactions.total)
 			report += fmt.Sprintf("Number of transactions in %s: %d\n", month, transactions.total)
 			report += fmt.Sprintf("Average transaction value in %s: $%.2f\n", month, avgTransactionValue)
+		}
+
+		// Insert data into the database
+		_, err = conn.Exec(context.Background(),
+			"INSERT INTO transactions (transaction_id, date, product_id, quantity, price) VALUES ($1, $2, $3, $4, $5)",
+			transactionId, date, productId, productQuantity, productPrice)
+		if err != nil {
+			log.Fatal("Unable to insert data:", err)
 		}
 
 	}
