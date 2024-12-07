@@ -1,0 +1,33 @@
+#version: '3.7'
+
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5433:5432"
+    volumes:
+        # Mounting the postgres data directory to ensure data persistence
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  ecommerce-transaction-processor-app:
+    build: .
+    depends_on:
+      - postgres
+    environment:
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=mydatabase
+      - POSTGRES_HOST=postgres
+    ports:
+      - "8080:8080"
+    working_dir: /app
+    command: ["./main"]
+
+# Define named volume for persisting PostgreSQL data
+volumes:
+  pg_data:

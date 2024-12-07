@@ -30,10 +30,16 @@ func main() {
 	totalRevenue := 0.0
 	report := ""
 
+	postgresUser := os.Getenv("POSTGRES_USER")
+	postgresPassword := os.Getenv("POSTGRES_PASSWORD")
+	postgresDB := os.Getenv("POSTGRES_DB")
+	postgresHost := os.Getenv("POSTGRES_HOST")
+
 	// Set up the PostgreSQL connection URL
 	// Username is "myuser" and password is "mypassword" and was set up in "Dockerfile"
 	// Database name is mydatabase and was set up in Dockerfile
-	connStr := "postgres://myuser:mypassword@localhost:5433/mydatabase"
+	//connStr := "postgres://postgresUser:postgresPassword@postgresHost:5433/postgresDB"
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:5432/%s", postgresUser, postgresPassword, postgresHost, postgresDB)
 
 	// Establish the connection
 	conn, err := pgx.Connect(context.Background(), connStr)
@@ -67,30 +73,30 @@ func main() {
 			continue
 		}
 
-		transactionId, err := strconv.Atoi(record[0])
+		/*transactionId, err := strconv.Atoi(record[0])
 		if err != nil {
 			log.Fatal(err)
-		}
+		}*/
 
-		date, err := time.Parse("01/02/06", record[1])
+		date, err := time.Parse("01/02/06", record[0])
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		month := date.Month().String()
 
-		productId, err := strconv.Atoi(record[2])
+		productId, err := strconv.Atoi(record[1])
 
 		if _, exists := transactionsByMonth[month]; !exists {
 			transactionsByMonth[month] = MonthTransactions{0, 0}
 		}
 
-		productQuantity, err := strconv.ParseFloat(record[3], 64)
+		productQuantity, err := strconv.ParseFloat(record[2], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		productPrice, err := strconv.ParseFloat(record[4], 64)
+		productPrice, err := strconv.ParseFloat(record[3], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -113,8 +119,8 @@ func main() {
 
 		// Insert data into the database
 		_, err = conn.Exec(context.Background(),
-			"INSERT INTO transactions (transaction_id, date, product_id, quantity, price) VALUES ($1, $2, $3, $4, $5)",
-			transactionId, date, productId, productQuantity, productPrice)
+			"INSERT INTO transactions (date, product_id, quantity, price) VALUES ($1, $2, $3, $4)",
+			date, productId, productQuantity, productPrice)
 		if err != nil {
 			log.Fatal("Unable to insert data:", err)
 		}
